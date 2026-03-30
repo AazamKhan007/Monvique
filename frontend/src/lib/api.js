@@ -1,5 +1,8 @@
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000/api";
-const API_ORIGIN = API_BASE.replace(/\/?api\/?$/, "");
+const DEFAULT_API_BASE = import.meta.env.DEV ? "http://localhost:8000/api" : "/api";
+const API_BASE = import.meta.env.VITE_API_BASE || DEFAULT_API_BASE;
+const API_ORIGIN = /^https?:\/\//i.test(API_BASE)
+  ? API_BASE.replace(/\/?api\/?$/, "")
+  : window.location.origin;
 
 export function toAssetUrl(imagePath = "") {
   if (!imagePath) {

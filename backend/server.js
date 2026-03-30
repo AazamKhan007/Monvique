@@ -11,10 +11,21 @@ const userRouter = require("./routes/user");
 
 const app = express();
 const PORT = process.env.PORT || 8000;
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+const FRONTEND_ORIGINS = [
+  ...(process.env.FRONTEND_ORIGINS || "").split(",").map((origin) => origin.trim()).filter(Boolean),
+  ...(process.env.FRONTEND_ORIGIN ? [process.env.FRONTEND_ORIGIN.trim()] : []),
+  "http://localhost:5173",
+];
+const ALLOWED_ORIGINS = [...new Set(FRONTEND_ORIGINS)];
+const isProduction = process.env.NODE_ENV === "production";
 
 app.use(cors({
-  origin: FRONTEND_ORIGIN,
+  origin(origin, callback) {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error(`Origin ${origin} not allowed by CORS`));
+  },
   credentials: true,
 }));
 
@@ -24,6 +35,9 @@ app.use("/uploads", express.static(path.join(__dirname, "..", "public", "uploads
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(methodOverride("_method"));
+if (isProduction) {
+  app.set("trust proxy", 1);
+}
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "crud-app-secret",
@@ -31,7 +45,8 @@ app.use(
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: isProduction ? "none" : "lax",
+      secure: isProduction,
     },
   })
 );
