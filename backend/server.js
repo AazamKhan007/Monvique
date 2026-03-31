@@ -55,10 +55,11 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(methodOverride("_method"));
 if (isProduction) {
-  app.set("trust proxy", 1);
+  app.set("trust proxy", true);
 }
 app.use(
   session({
+    name: "monvique.sid",
     secret: process.env.SESSION_SECRET || "crud-app-secret",
     store: process.env.MONGO_URL
       ? MongoStore.create({
@@ -67,8 +68,10 @@ app.use(
           autoRemove: "native",
         })
       : undefined,
+    proxy: isProduction,
     resave: false,
     saveUninitialized: false,
+    unset: "destroy",
     cookie: {
       httpOnly: true,
       sameSite: isProduction ? "none" : "lax",

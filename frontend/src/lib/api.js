@@ -1,4 +1,6 @@
-const DEFAULT_API_BASE = import.meta.env.DEV ? "http://localhost:5000/api" : "/api";
+const DEFAULT_API_BASE = import.meta.env.DEV
+  ? "http://localhost:5000/api"
+  : (import.meta.env.VITE_API_BASE || "https://monvique-an7h.vercel.app/api");
 
 function normalizeApiBase(rawBase) {
   const base = String(rawBase || "").trim();
@@ -50,7 +52,9 @@ async function request(path, options = {}) {
   const payload = contentType.includes("application/json") ? await response.json() : {};
 
   if (!response.ok) {
-    throw new Error(payload.message || "Request failed");
+    const error = new Error(payload.message || "Request failed");
+    error.status = response.status;
+    throw error;
   }
 
   return payload;

@@ -15,6 +15,11 @@ export default function ProductsPage({ user, setCartCount, cartCount, onLoggedOu
       setProducts(data.products || []);
       setError("");
     } catch (err) {
+      if (err?.status === 401) {
+        onLoggedOut();
+        navigate("/login", { replace: true });
+        return;
+      }
       setError(err.message);
     }
   };
@@ -30,9 +35,14 @@ export default function ProductsPage({ user, setCartCount, cartCount, onLoggedOu
           nextQty[item.product._id] = item.quantity;
         });
         setQuantities(nextQty);
-      }).catch(() => {});
+      }).catch((err) => {
+        if (err?.status === 401) {
+          onLoggedOut();
+          navigate("/login", { replace: true });
+        }
+      });
     }
-  }, [user, setCartCount]);
+  }, [user, setCartCount, onLoggedOut, navigate]);
 
   const filtered = useMemo(() => products, [products]);
 
@@ -84,9 +94,12 @@ export default function ProductsPage({ user, setCartCount, cartCount, onLoggedOu
   };
 
   const logout = async () => {
-    await api.logout();
-    onLoggedOut();
-    navigate("/login");
+    try {
+      await api.logout();
+    } finally {
+      onLoggedOut();
+      navigate("/login");
+    }
   };
 
   if (user?.role === "admin") {
