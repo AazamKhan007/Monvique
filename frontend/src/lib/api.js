@@ -57,6 +57,11 @@ export const api = {
   }),
   removeCartItem: (productId) => request(`/product/cart/${productId}/remove`, { method: "POST" }),
   checkoutCart: () => request("/product/cart/checkout", { method: "POST" }),
+  createCheckoutOrder: () => request("/product/cart/checkout/order", { method: "POST" }),
+  verifyCheckoutPayment: (body) => request("/product/cart/checkout/verify", {
+    method: "POST",
+    body: JSON.stringify(body),
+  }),
   createProduct: (formData) => request("/product", { method: "POST", body: formData }),
   updateProduct: (id, formData) => request(`/product/${id}`, { method: "PUT", body: formData }),
   deleteProduct: (id) => request(`/product/${id}`, { method: "DELETE" }),

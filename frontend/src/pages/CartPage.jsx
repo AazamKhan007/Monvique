@@ -2,11 +2,27 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, toAssetUrl } from "../lib/api";
 
+async function ensureRazorpayScript() {
+  if (window.Razorpay) {
+    return true;
+  }
+
+  return new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
+
 export default function CartPage({ setCartCount }) {
   const navigate = useNavigate();
   const [data, setData] = useState({ cartItems: [], totalItems: 0, totalAmount: 0, cartCount: 0 });
   const [error, setError] = useState("");
   const [pendingByProduct, setPendingByProduct] = useState({});
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   const loadCart = async () => {
     try {
@@ -84,12 +100,57 @@ export default function CartPage({ setCartCount }) {
   };
 
   const checkout = async () => {
+    if (checkoutLoading) {
+      return;
+    }
+
+    setCheckoutLoading(true);
+    setError("");
+
     try {
-      const payload = await api.checkoutCart();
-      setCartCount(0);
-      navigate("/checkout-success", { state: payload });
+      const scriptReady = await ensureRazorpayScript();
+      if (!scriptReady) {
+        throw new Error("Razorpay SDK failed to load");
+      }
+
+      const orderPayload = await api.createCheckoutOrder();
+      const options = {
+        key: orderPayload.keyId,
+        amount: orderPayload.amount,
+        currency: orderPayload.currency,
+        name: "Monvique",
+        description: `Cart checkout (${orderPayload.itemCount} item${orderPayload.itemCount > 1 ? "s" : ""})`,
+        order_id: orderPayload.orderId,
+        handler: async (response) => {
+          try {
+            const verified = await api.verifyCheckoutPayment(response);
+            setCartCount(0);
+            navigate("/checkout-success", { state: verified });
+          } catch (verifyError) {
+            setError(verifyError.message || "Payment verification failed");
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setCheckoutLoading(false);
+          },
+        },
+        prefill: {},
+        theme: {
+          color: "#111827",
+        },
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.on("payment.failed", (event) => {
+        const reason = event?.error?.description || "Payment failed";
+        setError(reason);
+        setCheckoutLoading(false);
+      });
+      razorpay.open();
     } catch (err) {
       setError(err.message);
+      setCheckoutLoading(false);
     }
   };
 
@@ -151,7 +212,9 @@ export default function CartPage({ setCartCount }) {
           <aside className="cart-summary">
             <div className="summary-row"><span>Total quantity</span><strong>{data.totalItems}</strong></div>
             <div className="summary-row total-row"><span>Payable amount</span><strong>Rs. {data.totalAmount}</strong></div>
-            <button type="button" className="primary-btn full-btn" onClick={checkout}>Checkout</button>
+            <button type="button" className="primary-btn full-btn" onClick={checkout} disabled={checkoutLoading}>
+              {checkoutLoading ? "Opening payment..." : "Checkout"}
+            </button>
           </aside>
         </section>
       )}

@@ -18,6 +18,7 @@ export default function CheckoutSuccessPage() {
         <h2>{label}</h2>
         <p>Items: <strong>{data.itemCount}</strong></p>
         <p>Total paid: <strong>Rs. {data.totalAmount}</strong></p>
+        {data.paymentId && <p>Payment ID: <strong>{data.paymentId}</strong></p>}
         <Link to="/products" className="back-link">Continue Shopping</Link>
       </section>
     </main>

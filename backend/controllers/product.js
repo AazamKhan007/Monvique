@@ -1,6 +1,16 @@
 const Product = require("../models/product");
 const User = require("../models/user");
 const { hasCloudinaryConfig, uploadBufferToCloudinary } = require("../cloudinary");
+const crypto = require("crypto");
+const Razorpay = require("razorpay");
+
+const hasRazorpayConfig = Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
+const razorpayClient = hasRazorpayConfig
+  ? new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    })
+  : null;
 
 function isAdmin(req) {
   return Boolean(req.session?.user?.role === "admin");
@@ -56,6 +66,18 @@ function getPreparedCartItems(user) {
   }
 
   return user.cart.filter((item) => item.product);
+}
+
+function getCartSummary(user) {
+  const cartItems = getPreparedCartItems(user);
+  const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  const totalAmount = cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+  return {
+    cartItems,
+    totalItems,
+    totalAmount,
+    cartCount: cartItems.length,
+  };
 }
 
 async function handleGetAllProducts(req, res) {
@@ -256,16 +278,7 @@ async function handleGetCart(req, res) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const cartItems = getPreparedCartItems(user);
-    const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-    const totalAmount = cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-
-    return res.json({
-      cartItems,
-      totalItems,
-      totalAmount,
-      cartCount: cartItems.length,
-    });
+    return res.json(getCartSummary(user));
   } catch (error) {
     return res.status(500).json({ message: "Failed to fetch cart" });
   }
@@ -356,9 +369,7 @@ async function handleCheckout(req, res) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const cartItems = getPreparedCartItems(user);
-    const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-    const totalAmount = cartItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+    const { totalItems, totalAmount } = getCartSummary(user);
 
     user.cart = [];
     await user.save();
@@ -374,6 +385,99 @@ async function handleCheckout(req, res) {
   }
 }
 
+async function handleCreateCheckoutOrder(req, res) {
+  if (!isUser(req)) {
+    return res.status(403).json({ message: "Only users can checkout" });
+  }
+
+  if (!hasRazorpayConfig || !razorpayClient) {
+    return res.status(500).json({ message: "Razorpay is not configured" });
+  }
+
+  try {
+    const user = await getUserWithCart(req.session.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const { totalItems, totalAmount } = getCartSummary(user);
+    if (totalItems <= 0 || totalAmount <= 0) {
+      return res.status(400).json({ message: "Cart is empty" });
+    }
+
+    const receiptId = `rcpt_${Date.now()}_${String(req.session.user.id).slice(-6)}`;
+    const order = await razorpayClient.orders.create({
+      amount: Math.round(totalAmount * 100),
+      currency: "INR",
+      receipt: receiptId,
+      notes: {
+        userId: String(req.session.user.id),
+        totalItems: String(totalItems),
+      },
+    });
+
+    return res.json({
+      amount: order.amount,
+      currency: order.currency,
+      itemCount: totalItems,
+      keyId: process.env.RAZORPAY_KEY_ID,
+      orderId: order.id,
+      success: true,
+      totalAmount,
+    });
+  } catch (error) {
+    console.error("Create Razorpay order failed:", error);
+    return res.status(500).json({ message: "Failed to initiate payment" });
+  }
+}
+
+async function handleVerifyCheckoutPayment(req, res) {
+  if (!isUser(req)) {
+    return res.status(403).json({ message: "Only users can checkout" });
+  }
+
+  if (!hasRazorpayConfig) {
+    return res.status(500).json({ message: "Razorpay is not configured" });
+  }
+
+  try {
+    const { razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: signature } = req.body;
+
+    if (!orderId || !paymentId || !signature) {
+      return res.status(400).json({ message: "Incomplete payment response" });
+    }
+
+    const generatedSignature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(`${orderId}|${paymentId}`)
+      .digest("hex");
+
+    if (generatedSignature !== signature) {
+      return res.status(400).json({ message: "Invalid payment signature" });
+    }
+
+    const user = await getUserWithCart(req.session.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const { totalItems, totalAmount } = getCartSummary(user);
+    user.cart = [];
+    await user.save();
+
+    return res.json({
+      checkoutType: "cart",
+      itemCount: totalItems,
+      paymentId,
+      success: true,
+      totalAmount,
+    });
+  } catch (error) {
+    console.error("Verify Razorpay payment failed:", error);
+    return res.status(500).json({ message: "Payment verification failed" });
+  }
+}
+
 module.exports = {
   handleGetAllProducts,
   handleGetProductDetail,
@@ -386,4 +490,6 @@ module.exports = {
   handleUpdateCartQuantity,
   handleRemoveCartItem,
   handleCheckout,
+  handleCreateCheckoutOrder,
+  handleVerifyCheckoutPayment,
 };
