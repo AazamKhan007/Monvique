@@ -1,6 +1,4 @@
-const DEFAULT_API_BASE = import.meta.env.DEV
-  ? "http://localhost:5000/api"
-  : (import.meta.env.VITE_API_BASE || "https://monvique-an7h.vercel.app/api");
+const DEFAULT_API_BASE = import.meta.env.DEV ? "http://localhost:5000/api" : "/api";
 
 function normalizeApiBase(rawBase) {
   const base = String(rawBase || "").trim();
@@ -24,16 +22,9 @@ function normalizeApiBase(rawBase) {
   }
 }
 
-const PRIMARY_API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE || DEFAULT_API_BASE);
-const API_BASE_CANDIDATES = [
-  PRIMARY_API_BASE,
-  "/api",
-  "https://monvique-an7h.vercel.app/api",
-  ...(import.meta.env.DEV ? ["http://localhost:5000/api"] : []),
-].filter(Boolean).filter((value, index, arr) => arr.indexOf(value) === index);
-
-const API_ORIGIN = /^https?:\/\//i.test(PRIMARY_API_BASE)
-  ? PRIMARY_API_BASE.replace(/\/?api\/?$/, "")
+const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE || DEFAULT_API_BASE);
+const API_ORIGIN = /^https?:\/\//i.test(API_BASE)
+  ? API_BASE.replace(/\/?api\/?$/, "")
   : window.location.origin;
 
 export function toAssetUrl(imagePath = "") {
@@ -54,47 +45,25 @@ export function toAssetUrl(imagePath = "") {
 
 async function request(path, options = {}) {
   const isFormData = options.body instanceof FormData;
-  let lastError = null;
+  const response = await fetch(`${API_BASE}${path}`, {
+    credentials: "include",
+    ...options,
+    headers: {
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
+      ...(options.headers || {}),
+    },
+  });
 
-  for (const base of API_BASE_CANDIDATES) {
-    try {
-      const response = await fetch(`${base}${path}`, {
-        credentials: "include",
-        ...options,
-        headers: {
-          ...(isFormData ? {} : { "Content-Type": "application/json" }),
-          ...(options.headers || {}),
-        },
-      });
+  const contentType = response.headers.get("content-type") || "";
+  const payload = contentType.includes("application/json") ? await response.json() : {};
 
-      const contentType = response.headers.get("content-type") || "";
-      const payload = contentType.includes("application/json") ? await response.json() : {};
-
-      if (response.ok) {
-        return payload;
-      }
-
-      const error = new Error(payload.message || "Request failed");
-      error.status = response.status;
-
-      if (response.status === 404 && payload?.message === "Route not found") {
-        lastError = error;
-        continue;
-      }
-
-      throw error;
-    } catch (error) {
-      lastError = error;
-
-      // Retry with next candidate only when endpoint/path or network is uncertain.
-      const shouldRetry = !error?.status || error?.status === 404;
-      if (!shouldRetry) {
-        throw error;
-      }
-    }
+  if (!response.ok) {
+    const error = new Error(payload.message || "Request failed");
+    error.status = response.status;
+    throw error;
   }
 
-  throw lastError || new Error("Request failed");
+  return payload;
 }
 
 export const api = {

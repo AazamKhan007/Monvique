@@ -23,6 +23,7 @@ const isProduction = process.env.NODE_ENV === "production";
 
 function isOriginAllowed(origin) {
   if (!origin) {
+    // Same-origin or server-to-server (like Vercel rewrites) may not send Origin.
     return true;
   }
 
@@ -42,7 +43,7 @@ app.use(cors({
     }
 
     console.warn(`Blocked CORS origin: ${origin}`);
-    return callback(null, false);
+    return callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
 }));
