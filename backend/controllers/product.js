@@ -475,6 +475,97 @@ async function handleVerifyCheckoutPayment(req, res) {
   } catch (error) {
     console.error("Verify Razorpay payment failed:", error);
     return res.status(500).json({ message: "Payment verification failed" });
+
+  async function handleCreateBuyNowOrder(req, res) {
+    if (!isUser(req)) {
+      return res.status(403).json({ message: "Only users can buy" });
+    }
+
+    if (!hasRazorpayConfig || !razorpayClient) {
+      return res.status(500).json({ message: "Razorpay is not configured" });
+    }
+
+    try {
+      const { id } = req.params;
+      const quantity = sanitizeQuantity(req.body.quantity);
+
+      const product = await Product.findById(id);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      const totalAmount = quantity * product.price;
+      const receiptId = `buynow_${Date.now()}_${String(req.session.user.id).slice(-6)}`;
+      const order = await razorpayClient.orders.create({
+        amount: Math.round(totalAmount * 100),
+        currency: "INR",
+        receipt: receiptId,
+        notes: {
+          userId: String(req.session.user.id),
+          productId: String(id),
+          quantity: String(quantity),
+        },
+      });
+
+      return res.json({
+        amount: order.amount,
+        currency: order.currency,
+        itemCount: quantity,
+        keyId: process.env.RAZORPAY_KEY_ID,
+        orderId: order.id,
+        success: true,
+        totalAmount,
+      });
+    } catch (error) {
+      console.error("Create buy-now order failed:", error);
+      return res.status(500).json({ message: "Failed to initiate payment" });
+    }
+  }
+
+  async function handleVerifyBuyNowPayment(req, res) {
+    if (!isUser(req)) {
+      return res.status(403).json({ message: "Only users can buy" });
+    }
+
+    if (!hasRazorpayConfig) {
+      return res.status(500).json({ message: "Razorpay is not configured" });
+    }
+
+    try {
+      const { razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: signature } = req.body;
+
+      if (!orderId || !paymentId || !signature) {
+        return res.status(400).json({ message: "Incomplete payment response" });
+      }
+
+      const generatedSignature = crypto
+        .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+        .update(`${orderId}|${paymentId}`)
+        .digest("hex");
+
+      if (generatedSignature !== signature) {
+        return res.status(400).json({ message: "Invalid payment signature" });
+      }
+
+      const user = await User.findById(req.session.user.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      user.cart = [];
+      await user.save();
+
+      return res.json({
+        checkoutType: "buy-now",
+        paymentId,
+        success: true,
+      });
+    } catch (error) {
+      console.error("Verify buy-now payment failed:", error);
+      return res.status(500).json({ message: "Payment verification failed" });
+    }
+  }
+
   }
 }
 
@@ -492,4 +583,6 @@ module.exports = {
   handleCheckout,
   handleCreateCheckoutOrder,
   handleVerifyCheckoutPayment,
+  handleCreateBuyNowOrder,
+  handleVerifyBuyNowPayment,
 };

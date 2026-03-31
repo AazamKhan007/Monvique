@@ -41,14 +41,53 @@ export default function ProductDetailPage({ user, setCartCount }) {
 
   const buyNow = async () => {
     try {
-      const payload = await api.buyNow(id, quantity);
-      setCartCount(0);
-      navigate("/checkout-success", { state: payload });
+      setError("");
+      const orderPayload = await api.createBuyNowOrder(id, quantity);
+
+      if (!window.Razorpay) {
+        throw new Error("Razorpay SDK not loaded");
+      }
+
+      const razorpayOptions = {
+        key: orderPayload.keyId,
+        order_id: orderPayload.orderId,
+        amount: orderPayload.amount,
+        currency: orderPayload.currency,
+        handler: async (response) => {
+          try {
+            await api.verifyBuyNowPayment(id, {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+            setCartCount(0);
+            navigate("/checkout-success", {
+              state: {
+                checkoutType: "buy-now",
+                itemCount: orderPayload.itemCount,
+                totalAmount: orderPayload.totalAmount,
+                success: true,
+              },
+            });
+          } catch (verifyError) {
+            setError(`Payment verification failed: ${verifyError.message}`);
+          }
+        },
+        prefill: {
+          email: user?.email || "",
+          contact: user?.phone || "",
+        },
+        theme: {
+          color: "#3399cc",
+        },
+      };
+
+      const razorpay = new window.Razorpay(razorpayOptions);
+      razorpay.open();
     } catch (err) {
       setError(err.message);
     }
   };
-
   if (!product) {
     return (
       <main className="container page-wrap">
