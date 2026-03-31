@@ -61,15 +61,14 @@ export const api = {
   verifyCheckoutPayment: (body) => request("/product/cart/checkout/verify", {
     method: "POST",
     body: JSON.stringify(body),
-    createBuyNowOrder: (id, quantity) => request(`/product/${id}/buy-now/order`, {
-      method: "POST",
-      body: JSON.stringify({ quantity }),
-    }),
-    verifyBuyNowPayment: (body) => request(`/product/buy-now/verify`, {
-        verifyBuyNowPayment: (id, body) => request(`/product/${id}/buy-now/verify`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+  }),
+  createBuyNowOrder: (id, quantity) => request(`/product/${id}/buy-now/order`, {
+    method: "POST",
+    body: JSON.stringify({ quantity }),
+  }),
+  verifyBuyNowPayment: (id, body) => request(`/product/${id}/buy-now/verify`, {
+    method: "POST",
+    body: JSON.stringify(body),
   }),
   createProduct: (formData) => request("/product", { method: "POST", body: formData }),
   updateProduct: (id, formData) => request(`/product/${id}`, { method: "PUT", body: formData }),
