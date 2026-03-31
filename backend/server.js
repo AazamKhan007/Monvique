@@ -2,8 +2,7 @@ require("dotenv").config();
 
 const express = require("express");
 const path = require("path");
-const session = require("express-session");
-const MongoStore = require("connect-mongo");
+const cookieSession = require("cookie-session");
 const methodOverride = require("method-override");
 const cors = require("cors");
 
@@ -58,26 +57,13 @@ if (isProduction) {
   app.set("trust proxy", true);
 }
 app.use(
-  session({
+  cookieSession({
     name: "monvique.sid",
-    secret: process.env.SESSION_SECRET || "crud-app-secret",
-    store: process.env.MONGO_URL
-      ? MongoStore.create({
-          mongoUrl: process.env.MONGO_URL,
-          ttl: 14 * 24 * 60 * 60,
-          autoRemove: "native",
-        })
-      : undefined,
-    proxy: isProduction,
-    resave: false,
-    saveUninitialized: false,
-    unset: "destroy",
-    cookie: {
-      httpOnly: true,
-      sameSite: isProduction ? "none" : "lax",
-      secure: isProduction,
-      maxAge: 14 * 24 * 60 * 60 * 1000,
-    },
+    keys: [process.env.SESSION_SECRET || "crud-app-secret"],
+    maxAge: 14 * 24 * 60 * 60 * 1000,
+    httpOnly: true,
+    sameSite: isProduction ? "none" : "lax",
+    secure: isProduction,
   })
 );
 app.use(attachCurrentUser);
@@ -95,14 +81,9 @@ if (isProduction) {
 }
 
 app.use("/api/user", userRouter);
-app.use("/user", userRouter);
 app.use("/api/product", productRouter);
-app.use("/product", productRouter);
 
 app.get("/api/health", (req, res) => {
-  res.json({ ok: true });
-});
-app.get("/health", (req, res) => {
   res.json({ ok: true });
 });
 

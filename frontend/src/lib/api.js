@@ -24,9 +24,16 @@ function normalizeApiBase(rawBase) {
   }
 }
 
-const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE || DEFAULT_API_BASE);
-const API_ORIGIN = /^https?:\/\//i.test(API_BASE)
-  ? API_BASE.replace(/\/?api\/?$/, "")
+const PRIMARY_API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE || DEFAULT_API_BASE);
+const API_BASE_CANDIDATES = [
+  PRIMARY_API_BASE,
+  "/api",
+  "https://monvique-an7h.vercel.app/api",
+  ...(import.meta.env.DEV ? ["http://localhost:5000/api"] : []),
+].filter(Boolean).filter((value, index, arr) => arr.indexOf(value) === index);
+
+const API_ORIGIN = /^https?:\/\//i.test(PRIMARY_API_BASE)
+  ? PRIMARY_API_BASE.replace(/\/?api\/?$/, "")
   : window.location.origin;
 
 export function toAssetUrl(imagePath = "") {
@@ -47,41 +54,11 @@ export function toAssetUrl(imagePath = "") {
 
 async function request(path, options = {}) {
   const isFormData = options.body instanceof FormData;
-  let response = await fetch(`${API_BASE}${path}`, {
-    credentials: "include",
-    ...options,
-    headers: {
-      ...(isFormData ? {} : { "Content-Type": "application/json" }),
-      ...(options.headers || {}),
-    },
-  });
+  let lastError = null;
 
-  let contentType = response.headers.get("content-type") || "";
-  let payload = contentType.includes("application/json") ? await response.json() : {};
-
-  function swapApiPrefix(urlValue) {
-    if (!urlValue) {
-      return urlValue;
-    }
-
-    if (/\/api\//i.test(urlValue)) {
-      return urlValue.replace(/\/api\//i, "/");
-    }
-
-    if (/^https?:\/\//i.test(urlValue)) {
-      const parsed = new URL(urlValue);
-      parsed.pathname = `/api${parsed.pathname.startsWith("/") ? parsed.pathname : `/${parsed.pathname}`}`;
-      return parsed.toString();
-    }
-
-    return urlValue;
-  }
-
-  if (response.status === 404 && payload?.message === "Route not found") {
-    const retryBase = swapApiPrefix(API_BASE);
-    const retryUrl = `${retryBase}${path}`;
-    if (retryUrl !== `${API_BASE}${path}`) {
-      response = await fetch(retryUrl, {
+  for (const base of API_BASE_CANDIDATES) {
+    try {
+      const response = await fetch(`${base}${path}`, {
         credentials: "include",
         ...options,
         headers: {
@@ -89,18 +66,35 @@ async function request(path, options = {}) {
           ...(options.headers || {}),
         },
       });
-      contentType = response.headers.get("content-type") || "";
-      payload = contentType.includes("application/json") ? await response.json() : {};
+
+      const contentType = response.headers.get("content-type") || "";
+      const payload = contentType.includes("application/json") ? await response.json() : {};
+
+      if (response.ok) {
+        return payload;
+      }
+
+      const error = new Error(payload.message || "Request failed");
+      error.status = response.status;
+
+      if (response.status === 404 && payload?.message === "Route not found") {
+        lastError = error;
+        continue;
+      }
+
+      throw error;
+    } catch (error) {
+      lastError = error;
+
+      // Retry with next candidate only when endpoint/path or network is uncertain.
+      const shouldRetry = !error?.status || error?.status === 404;
+      if (!shouldRetry) {
+        throw error;
+      }
     }
   }
 
-  if (!response.ok) {
-    const error = new Error(payload.message || "Request failed");
-    error.status = response.status;
-    throw error;
-  }
-
-  return payload;
+  throw lastError || new Error("Request failed");
 }
 
 export const api = {
