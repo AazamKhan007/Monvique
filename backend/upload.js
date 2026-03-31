@@ -3,11 +3,13 @@ const multer = require("multer");
 const path = require("node:path");
 
 const uploadsPath = path.join(__dirname, "..", "public", "uploads");
-if (!fs.existsSync(uploadsPath)) {
+const isVercel = process.env.VERCEL === "1";
+
+if (!isVercel && !fs.existsSync(uploadsPath)) {
   fs.mkdirSync(uploadsPath, { recursive: true });
 }
 
-const storage = multer.diskStorage({
+const diskStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadsPath);
   },
@@ -18,7 +20,14 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({ storage });
+const memoryStorage = multer.memoryStorage();
+
+const upload = multer({
+  storage: isVercel ? memoryStorage : diskStorage,
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+  },
+});
 
 module.exports = {
   upload,

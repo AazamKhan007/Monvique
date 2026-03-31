@@ -11,7 +11,7 @@ export function toAssetUrl(imagePath = "") {
 
   const normalizedSlashes = String(imagePath).replace(/\\/g, "/");
 
-  if (/^https?:\/\//i.test(normalizedSlashes)) {
+  if (/^https?:\/\//i.test(normalizedSlashes) || /^data:/i.test(normalizedSlashes)) {
     return normalizedSlashes;
   }
 

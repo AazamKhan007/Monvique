@@ -14,6 +14,23 @@ function sanitizeQuantity(rawValue) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 }
 
+function getImageValue(file) {
+  if (!file) {
+    return "";
+  }
+
+  if (file.filename) {
+    return `/uploads/${file.filename}`;
+  }
+
+  if (file.buffer && file.mimetype) {
+    // In serverless environments we keep the image in Mongo as a data URL.
+    return `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
+  }
+
+  return "";
+}
+
 async function getUserWithCart(userId) {
   if (!userId) {
     return null;
@@ -87,7 +104,7 @@ async function createNewProduct(req, res) {
       price,
       discount,
       availability,
-      image: req.file ? `/uploads/${req.file.filename}` : "",
+      image: getImageValue(req.file),
       created_at: new Date(),
     });
 
@@ -109,7 +126,7 @@ async function handleUpdateProductById(req, res) {
     const updateData = { title, description, category, brand, price, discount, availability, updated_at: new Date() };
 
     if (req.file) {
-      updateData.image = `/uploads/${req.file.filename}`;
+      updateData.image = getImageValue(req.file);
     }
 
     const updatedProduct = await Product.findByIdAndUpdate(id, updateData, {
