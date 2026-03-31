@@ -68,6 +68,18 @@ app.use(
 );
 app.use(attachCurrentUser);
 
+if (isProduction) {
+  app.use("/api", async (req, res, next) => {
+    try {
+      await connectMongoDb(process.env.MONGO_URL || "mongodb://localhost:27017/Amazon");
+      return next();
+    } catch (error) {
+      console.error("Failed to connect MongoDB:", error);
+      return res.status(500).json({ message: "Database connection failed" });
+    }
+  });
+}
+
 app.use("/api/user", userRouter);
 app.use("/api/product", productRouter);
 
