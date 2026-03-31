@@ -19,12 +19,28 @@ const FRONTEND_ORIGINS = [
 const ALLOWED_ORIGINS = [...new Set(FRONTEND_ORIGINS)];
 const isProduction = process.env.NODE_ENV === "production";
 
+function isOriginAllowed(origin) {
+  if (!origin) {
+    return true;
+  }
+
+  const isExactMatch = ALLOWED_ORIGINS.includes(origin);
+  if (isExactMatch) {
+    return true;
+  }
+
+  // Allow Vercel preview/prod domains without listing each generated URL.
+  return /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin);
+}
+
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+    if (isOriginAllowed(origin)) {
       return callback(null, true);
     }
-    return callback(new Error(`Origin ${origin} not allowed by CORS`));
+
+    console.warn(`Blocked CORS origin: ${origin}`);
+    return callback(null, false);
   },
   credentials: true,
 }));
