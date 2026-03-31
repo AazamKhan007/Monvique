@@ -12,8 +12,16 @@ function normalizeApiBase(rawBase) {
     return base.replace(/\/+$/, "");
   }
 
-  const withoutTrailingSlash = base.replace(/\/+$/, "");
-  return `${withoutTrailingSlash.replace(/\/api$/i, "")}/api`;
+  try {
+    const parsed = new URL(base);
+    parsed.pathname = "/api";
+    parsed.search = "";
+    parsed.hash = "";
+    return parsed.toString().replace(/\/$/, "");
+  } catch {
+    const withoutTrailingSlash = base.replace(/\/+$/, "");
+    return `${withoutTrailingSlash.replace(/\/api$/i, "")}/api`;
+  }
 }
 
 const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE || DEFAULT_API_BASE);

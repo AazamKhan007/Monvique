@@ -8,6 +8,7 @@ export default function ProductsPage({ user, setCartCount, cartCount, onLoggedOu
   const [query, setQuery] = useState("");
   const [quantities, setQuantities] = useState({});
   const [loadingProducts, setLoadingProducts] = useState(true);
+  const [addingByProduct, setAddingByProduct] = useState({});
   const [error, setError] = useState("");
 
   const loadProducts = async (search = "") => {
@@ -18,8 +19,7 @@ export default function ProductsPage({ user, setCartCount, cartCount, onLoggedOu
       setError("");
     } catch (err) {
       if (err?.status === 401) {
-        onLoggedOut();
-        navigate("/login", { replace: true });
+        setError("Session refresh issue. Please wait and try again.");
         return;
       }
       setError(err.message);
@@ -74,12 +74,23 @@ export default function ProductsPage({ user, setCartCount, cartCount, onLoggedOu
   };
 
   const addToCart = async (id) => {
+    if (addingByProduct[id]) {
+      return;
+    }
+
+    setAddingByProduct((prev) => ({ ...prev, [id]: true }));
     try {
       const qty = normalizeQty(quantities[id] || 1);
       const payload = await api.addToCart(id, qty);
       setCartCount(payload.cartCount || 0);
     } catch (err) {
       setError(err.message);
+    } finally {
+      setAddingByProduct((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
     }
   };
 
@@ -237,7 +248,14 @@ export default function ProductsPage({ user, setCartCount, cartCount, onLoggedOu
                     />
                     <button type="button" className="qty-btn" onClick={() => changeQty(product._id, 1)}>+</button>
                   </div>
-                  <button type="button" className="primary-btn" onClick={() => addToCart(product._id)}>Add to Cart</button>
+                  <button
+                    type="button"
+                    className="primary-btn"
+                    disabled={Boolean(addingByProduct[product._id])}
+                    onClick={() => addToCart(product._id)}
+                  >
+                    {addingByProduct[product._id] ? "Adding..." : "Add to Cart"}
+                  </button>
                 </div>
               </div>
             </article>

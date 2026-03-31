@@ -2,20 +2,40 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, toAssetUrl } from "../lib/api";
 
+async function ensureRazorpayScript() {
+  if (window.Razorpay) {
+    return true;
+  }
+
+  return new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
+
 export default function ProductDetailPage({ user, setCartCount }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const [product, setProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
+  const [loadingDetail, setLoadingDetail] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [buying, setBuying] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    setLoadingDetail(true);
     api.getProduct(id)
       .then((data) => {
         setProduct(data.product);
         setQuantity(data.currentQuantity || 1);
       })
-      .catch((err) => setError(err.message));
+      .catch((err) => setError(err.message))
+      .finally(() => setLoadingDetail(false));
   }, [id]);
 
   useEffect(() => {
@@ -30,23 +50,36 @@ export default function ProductDetailPage({ user, setCartCount }) {
   };
 
   const addToCart = async () => {
+    if (adding) {
+      return;
+    }
+
+    setAdding(true);
     try {
       await api.addToCart(id, quantity);
       const cartData = await api.getCart();
       setCartCount(cartData.cartCount || 0);
     } catch (err) {
       setError(err.message);
+    } finally {
+      setAdding(false);
     }
   };
 
   const buyNow = async () => {
+    if (buying) {
+      return;
+    }
+
+    setBuying(true);
     try {
       setError("");
-      const orderPayload = await api.createBuyNowOrder(id, quantity);
-
-      if (!window.Razorpay) {
-        throw new Error("Razorpay SDK not loaded");
+      const scriptReady = await ensureRazorpayScript();
+      if (!scriptReady) {
+        throw new Error("Razorpay SDK failed to load");
       }
+
+      const orderPayload = await api.createBuyNowOrder(id, quantity);
 
       const razorpayOptions = {
         key: orderPayload.keyId,
@@ -71,7 +104,13 @@ export default function ProductDetailPage({ user, setCartCount }) {
             });
           } catch (verifyError) {
             setError(`Payment verification failed: ${verifyError.message}`);
+            setBuying(false);
           }
+        },
+        modal: {
+          ondismiss: () => {
+            setBuying(false);
+          },
         },
         prefill: {
           email: user?.email || "",
@@ -83,15 +122,33 @@ export default function ProductDetailPage({ user, setCartCount }) {
       };
 
       const razorpay = new window.Razorpay(razorpayOptions);
+      razorpay.on("payment.failed", (event) => {
+        const reason = event?.error?.description || "Payment failed";
+        setError(reason);
+        setBuying(false);
+      });
       razorpay.open();
     } catch (err) {
       setError(err.message);
+      setBuying(false);
     }
   };
+
+  if (loadingDetail) {
+    return (
+      <main className="container page-wrap">
+        <div className="page-loader">
+          <div className="spinner" />
+          <p className="subtle-copy">Loading product...</p>
+        </div>
+      </main>
+    );
+  }
+
   if (!product) {
     return (
       <main className="container page-wrap">
-        {error ? <p className="error-text">{error}</p> : <p>Loading...</p>}
+        {error ? <p className="error-text">{error}</p> : <p className="empty">Product not found.</p>}
       </main>
     );
   }
@@ -129,11 +186,15 @@ export default function ProductDetailPage({ user, setCartCount }) {
                 />
                 <button type="button" className="qty-btn" onClick={() => syncQuantity(quantity + 1)}>+</button>
               </div>
-              <button type="button" onClick={addToCart}>Add to Cart</button>
+              <button type="button" onClick={addToCart} disabled={adding || buying}>
+                {adding ? "Adding..." : "Add to Cart"}
+              </button>
             </div>
 
             <div className="inline-form qty-form buy-form">
-              <button type="button" className="primary-btn" onClick={buyNow}>Buy Now</button>
+              <button type="button" className="primary-btn" onClick={buyNow} disabled={buying || adding}>
+                {buying ? "Opening payment..." : "Buy Now"}
+              </button>
             </div>
           </div>
           {error && <p className="error-text">{error}</p>}
