@@ -47,7 +47,7 @@ export function toAssetUrl(imagePath = "") {
 
 async function request(path, options = {}) {
   const isFormData = options.body instanceof FormData;
-  const response = await fetch(`${API_BASE}${path}`, {
+  let response = await fetch(`${API_BASE}${path}`, {
     credentials: "include",
     ...options,
     headers: {
@@ -56,8 +56,43 @@ async function request(path, options = {}) {
     },
   });
 
-  const contentType = response.headers.get("content-type") || "";
-  const payload = contentType.includes("application/json") ? await response.json() : {};
+  let contentType = response.headers.get("content-type") || "";
+  let payload = contentType.includes("application/json") ? await response.json() : {};
+
+  function swapApiPrefix(urlValue) {
+    if (!urlValue) {
+      return urlValue;
+    }
+
+    if (/\/api\//i.test(urlValue)) {
+      return urlValue.replace(/\/api\//i, "/");
+    }
+
+    if (/^https?:\/\//i.test(urlValue)) {
+      const parsed = new URL(urlValue);
+      parsed.pathname = `/api${parsed.pathname.startsWith("/") ? parsed.pathname : `/${parsed.pathname}`}`;
+      return parsed.toString();
+    }
+
+    return urlValue;
+  }
+
+  if (response.status === 404 && payload?.message === "Route not found") {
+    const retryBase = swapApiPrefix(API_BASE);
+    const retryUrl = `${retryBase}${path}`;
+    if (retryUrl !== `${API_BASE}${path}`) {
+      response = await fetch(retryUrl, {
+        credentials: "include",
+        ...options,
+        headers: {
+          ...(isFormData ? {} : { "Content-Type": "application/json" }),
+          ...(options.headers || {}),
+        },
+      });
+      contentType = response.headers.get("content-type") || "";
+      payload = contentType.includes("application/json") ? await response.json() : {};
+    }
+  }
 
   if (!response.ok) {
     const error = new Error(payload.message || "Request failed");

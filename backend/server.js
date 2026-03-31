@@ -95,9 +95,14 @@ if (isProduction) {
 }
 
 app.use("/api/user", userRouter);
+app.use("/user", userRouter);
 app.use("/api/product", productRouter);
+app.use("/product", productRouter);
 
 app.get("/api/health", (req, res) => {
+  res.json({ ok: true });
+});
+app.get("/health", (req, res) => {
   res.json({ ok: true });
 });
 
