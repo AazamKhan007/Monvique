@@ -1,5 +1,6 @@
 const Product = require("../models/product");
 const User = require("../models/user");
+const { hasCloudinaryConfig, uploadBufferToCloudinary } = require("../cloudinary");
 
 function isAdmin(req) {
   return Boolean(req.session?.user?.role === "admin");
@@ -14,7 +15,7 @@ function sanitizeQuantity(rawValue) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 }
 
-function getImageValue(file) {
+async function getImageValue(file) {
   if (!file) {
     return "";
   }
@@ -24,6 +25,16 @@ function getImageValue(file) {
   }
 
   if (file.buffer && file.mimetype) {
+    if (hasCloudinaryConfig) {
+      const cloudinaryResult = await uploadBufferToCloudinary(file.buffer, {
+        public_id: `${Date.now()}-${Math.round(Math.random() * 1e9)}`,
+      });
+
+      if (cloudinaryResult?.secure_url) {
+        return cloudinaryResult.secure_url;
+      }
+    }
+
     // In serverless environments we keep the image in Mongo as a data URL.
     return `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
   }
@@ -96,6 +107,7 @@ async function createNewProduct(req, res) {
 
   try {
     const { title, description, category, brand, price, discount, availability } = req.body;
+    const image = await getImageValue(req.file);
     const newProduct = new Product({
       title,
       description,
@@ -104,7 +116,7 @@ async function createNewProduct(req, res) {
       price,
       discount,
       availability,
-      image: getImageValue(req.file),
+      image,
       created_at: new Date(),
     });
 
@@ -126,7 +138,7 @@ async function handleUpdateProductById(req, res) {
     const updateData = { title, description, category, brand, price, discount, availability, updated_at: new Date() };
 
     if (req.file) {
-      updateData.image = getImageValue(req.file);
+      updateData.image = await getImageValue(req.file);
     }
 
     const updatedProduct = await Product.findByIdAndUpdate(id, updateData, {
@@ -190,7 +202,11 @@ async function handleUpsertCartItem(req, res) {
     }
 
     await user.save();
-    return res.json({ success: true });
+    return res.json({
+      success: true,
+      cartCount: user.cart.length,
+      quantity,
+    });
   } catch (error) {
     return res.status(500).json({ message: "Failed to update cart" });
   }

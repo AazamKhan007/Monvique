@@ -6,6 +6,7 @@ export default function CartPage({ setCartCount }) {
   const navigate = useNavigate();
   const [data, setData] = useState({ cartItems: [], totalItems: 0, totalAmount: 0, cartCount: 0 });
   const [error, setError] = useState("");
+  const [pendingByProduct, setPendingByProduct] = useState({});
 
   const loadCart = async () => {
     try {
@@ -22,6 +23,33 @@ export default function CartPage({ setCartCount }) {
   }, []);
 
   const changeQuantity = async (productId, action) => {
+    if (pendingByProduct[productId]) {
+      return;
+    }
+
+    const targetItem = data.cartItems.find((item) => item.product._id === productId);
+    if (!targetItem) {
+      return;
+    }
+
+    const nextQuantity = action === "decrement"
+      ? Math.max(1, targetItem.quantity - 1)
+      : targetItem.quantity + 1;
+    const quantityDelta = nextQuantity - targetItem.quantity;
+    const linePriceDelta = quantityDelta * Number(targetItem.product.price || 0);
+
+    setPendingByProduct((prev) => ({ ...prev, [productId]: true }));
+
+    const previousState = data;
+    setData((prev) => ({
+      ...prev,
+      cartItems: prev.cartItems.map((item) =>
+        item.product._id === productId ? { ...item, quantity: nextQuantity } : item
+      ),
+      totalItems: Math.max(0, prev.totalItems + quantityDelta),
+      totalAmount: Math.max(0, prev.totalAmount + linePriceDelta),
+    }));
+
     try {
       const updated = await api.updateCartQty(productId, action);
       setData((prev) => ({
@@ -36,6 +64,13 @@ export default function CartPage({ setCartCount }) {
       setCartCount(updated.cartCount);
     } catch (err) {
       setError(err.message);
+      setData(previousState);
+    } finally {
+      setPendingByProduct((prev) => {
+        const next = { ...prev };
+        delete next[productId];
+        return next;
+      });
     }
   };
 
@@ -88,9 +123,23 @@ export default function CartPage({ setCartCount }) {
                   <div className="qty-stepper-form">
                     <span className="qty-label">Qty</span>
                     <div className="qty-stepper">
-                      <button type="button" className="qty-btn" onClick={() => changeQuantity(item.product._id, "decrement")}>-</button>
+                      <button
+                        type="button"
+                        className="qty-btn"
+                        disabled={Boolean(pendingByProduct[item.product._id])}
+                        onClick={() => changeQuantity(item.product._id, "decrement")}
+                      >
+                        -
+                      </button>
                       <span className="qty-view">{item.quantity}</span>
-                      <button type="button" className="qty-btn" onClick={() => changeQuantity(item.product._id, "increment")}>+</button>
+                      <button
+                        type="button"
+                        className="qty-btn"
+                        disabled={Boolean(pendingByProduct[item.product._id])}
+                        onClick={() => changeQuantity(item.product._id, "increment")}
+                      >
+                        +
+                      </button>
                     </div>
                   </div>
                   <button type="button" className="ghost-btn" onClick={() => removeItem(item.product._id)}>Remove</button>

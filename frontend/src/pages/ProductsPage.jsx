@@ -63,9 +63,8 @@ export default function ProductsPage({ user, setCartCount, cartCount, onLoggedOu
   const addToCart = async (id) => {
     try {
       const qty = normalizeQty(quantities[id] || 1);
-      await api.addToCart(id, qty);
-      const cartData = await api.getCart();
-      setCartCount(cartData.cartCount || 0);
+      const payload = await api.addToCart(id, qty);
+      setCartCount(payload.cartCount || 0);
     } catch (err) {
       setError(err.message);
     }
