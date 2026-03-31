@@ -600,6 +600,14 @@ input[type=number] {
   color: var(--muted);
 }
 
+.page-loader {
+  min-height: 220px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+}
+
 .spinner {
   width: 32px;
   height: 32px;

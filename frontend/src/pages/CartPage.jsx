@@ -20,17 +20,21 @@ async function ensureRazorpayScript() {
 export default function CartPage({ setCartCount }) {
   const navigate = useNavigate();
   const [data, setData] = useState({ cartItems: [], totalItems: 0, totalAmount: 0, cartCount: 0 });
+  const [loadingCart, setLoadingCart] = useState(true);
   const [error, setError] = useState("");
   const [pendingByProduct, setPendingByProduct] = useState({});
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   const loadCart = async () => {
+    setLoadingCart(true);
     try {
       const payload = await api.getCart();
       setData(payload);
       setCartCount(payload.cartCount || 0);
     } catch (err) {
       setError(err.message);
+    } finally {
+      setLoadingCart(false);
     }
   };
 
@@ -163,7 +167,12 @@ export default function CartPage({ setCartCount }) {
 
       {error && <p className="error-text">{error}</p>}
 
-      {!data.cartItems.length ? (
+      {loadingCart ? (
+        <div className="page-loader">
+          <div className="spinner" />
+          <p className="subtle-copy">Loading cart...</p>
+        </div>
+      ) : !data.cartItems.length ? (
         <div className="empty-cart"><h3>Cart is empty</h3><p>Add products from home page.</p></div>
       ) : (
         <section className="cart-layout">

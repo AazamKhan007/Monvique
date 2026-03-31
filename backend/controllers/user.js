@@ -4,6 +4,22 @@ function getSessionUser(req) {
   return req.session?.user || null;
 }
 
+function persistSession(req) {
+  return new Promise((resolve, reject) => {
+    if (!req.session) {
+      return reject(new Error("Session is unavailable"));
+    }
+
+    req.session.save((error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
 async function handleUserSignup(req, res) {
   try {
     const { name, email, password } = req.body;
@@ -20,6 +36,8 @@ async function handleUserSignup(req, res) {
       email: user.email,
       role: user.role || "user",
     };
+
+    await persistSession(req);
 
     return res.status(201).json({ user: req.session.user });
   } catch (error) {
@@ -50,6 +68,8 @@ async function handleUserLogin(req, res) {
       role: user.role || "user",
     };
 
+    await persistSession(req);
+
     return res.json({ user: req.session.user });
   } catch (error) {
     return res.status(500).json({ message: "Login failed" });
@@ -57,9 +77,18 @@ async function handleUserLogin(req, res) {
 }
 
 function handleUserLogout(req, res) {
+  const isProduction = process.env.NODE_ENV === "production";
+  if (!req.session) {
+    res.clearCookie("monvique.sid", {
+      httpOnly: true,
+      sameSite: isProduction ? "none" : "lax",
+      secure: isProduction,
+    });
+    return res.json({ success: true });
+  }
+
   req.session.destroy(() => {
-    const isProduction = process.env.NODE_ENV === "production";
-    res.clearCookie("connect.sid", {
+    res.clearCookie("monvique.sid", {
       httpOnly: true,
       sameSite: isProduction ? "none" : "lax",
       secure: isProduction,

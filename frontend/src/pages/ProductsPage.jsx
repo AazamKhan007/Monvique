@@ -7,9 +7,11 @@ export default function ProductsPage({ user, setCartCount, cartCount, onLoggedOu
   const [products, setProducts] = useState([]);
   const [query, setQuery] = useState("");
   const [quantities, setQuantities] = useState({});
+  const [loadingProducts, setLoadingProducts] = useState(true);
   const [error, setError] = useState("");
 
   const loadProducts = async (search = "") => {
+    setLoadingProducts(true);
     try {
       const data = await api.getProducts(search);
       setProducts(data.products || []);
@@ -21,6 +23,8 @@ export default function ProductsPage({ user, setCartCount, cartCount, onLoggedOu
         return;
       }
       setError(err.message);
+    } finally {
+      setLoadingProducts(false);
     }
   };
 
@@ -37,8 +41,7 @@ export default function ProductsPage({ user, setCartCount, cartCount, onLoggedOu
         setQuantities(nextQty);
       }).catch((err) => {
         if (err?.status === 401) {
-          onLoggedOut();
-          navigate("/login", { replace: true });
+          setCartCount(0);
         }
       });
     }
@@ -196,10 +199,18 @@ export default function ProductsPage({ user, setCartCount, cartCount, onLoggedOu
         </section>
 
         {error && <p className="error-text">{error}</p>}
-        {filtered.length === 0 && <p className="empty">No products found.</p>}
+        {loadingProducts ? (
+          <div className="page-loader">
+            <div className="spinner" />
+            <p className="subtle-copy">Loading products...</p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <p className="empty">No products found.</p>
+        ) : null}
 
-        <section className="cards-grid">
-          {filtered.map((product) => (
+        {!loadingProducts && (
+          <section className="cards-grid">
+            {filtered.map((product) => (
             <article className="product-card user-card" key={product._id}>
               <Link to={`/products/${product._id}`} className="card-visual-link">
                 {product.image ? (
@@ -230,8 +241,9 @@ export default function ProductsPage({ user, setCartCount, cartCount, onLoggedOu
                 </div>
               </div>
             </article>
-          ))}
-        </section>
+            ))}
+          </section>
+        )}
       </main>
     </>
   );
