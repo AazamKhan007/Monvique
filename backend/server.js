@@ -84,12 +84,20 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: "Internal Server Error" });
 });
 
-connectMongoDb(process.env.MONGO_URL || "mongodb://localhost:27017/Amazon")
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`Backend running on http://localhost:${PORT}`);
+if (process.env.NODE_ENV !== "production") {
+  connectMongoDb(process.env.MONGO_URL || "mongodb://localhost:27017/Amazon")
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`Backend running on http://localhost:${PORT}`);
+      });
+    })
+    .catch((error) => {
+      console.error("Failed to connect MongoDB:", error);
     });
-  })
-  .catch((error) => {
+} else {
+  connectMongoDb(process.env.MONGO_URL || "mongodb://localhost:27017/Amazon").catch((error) => {
     console.error("Failed to connect MongoDB:", error);
   });
+}
+
+module.exports = app;
