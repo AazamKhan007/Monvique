@@ -48,7 +48,14 @@ export default function App() {
   }, []);
 
   if (loading) {
-    return <main className="centered-wrap"><p>Loading...</p></main>;
+    return (
+      <main className="centered-wrap">
+        <div className="app-loading">
+          <div className="spinner" />
+          <p>Loading your session...</p>
+        </div>
+      </main>
+    );
   }
 
   const showHeader = Boolean(

@@ -1,5 +1,20 @@
 const DEFAULT_API_BASE = import.meta.env.DEV ? "http://localhost:5000/api" : "/api";
-const API_BASE = import.meta.env.VITE_API_BASE ? `${import.meta.env.VITE_API_BASE}/api` : DEFAULT_API_BASE;
+
+function normalizeApiBase(rawBase) {
+  const base = String(rawBase || "").trim();
+  if (!base) {
+    return DEFAULT_API_BASE;
+  }
+
+  if (!/^https?:\/\//i.test(base)) {
+    return base.replace(/\/+$/, "");
+  }
+
+  const withoutTrailingSlash = base.replace(/\/+$/, "");
+  return `${withoutTrailingSlash.replace(/\/api$/i, "")}/api`;
+}
+
+const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE || DEFAULT_API_BASE);
 const API_ORIGIN = /^https?:\/\//i.test(API_BASE)
   ? API_BASE.replace(/\/?api\/?$/, "")
   : window.location.origin;

@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const session = require("express-session");
+const MongoStore = require("connect-mongo");
 const methodOverride = require("method-override");
 const cors = require("cors");
 
@@ -59,12 +60,20 @@ if (isProduction) {
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "crud-app-secret",
+    store: process.env.MONGO_URL
+      ? MongoStore.create({
+          mongoUrl: process.env.MONGO_URL,
+          ttl: 14 * 24 * 60 * 60,
+          autoRemove: "native",
+        })
+      : undefined,
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
       sameSite: isProduction ? "none" : "lax",
       secure: isProduction,
+      maxAge: 14 * 24 * 60 * 60 * 1000,
     },
   })
 );

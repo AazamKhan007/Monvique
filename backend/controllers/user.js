@@ -58,6 +58,12 @@ async function handleUserLogin(req, res) {
 
 function handleUserLogout(req, res) {
   req.session.destroy(() => {
+    const isProduction = process.env.NODE_ENV === "production";
+    res.clearCookie("connect.sid", {
+      httpOnly: true,
+      sameSite: isProduction ? "none" : "lax",
+      secure: isProduction,
+    });
     return res.json({ success: true });
   });
 }

@@ -6,16 +6,20 @@ export default function LoginPage({ onAuth }) {
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const submit = async (event) => {
     event.preventDefault();
     setError("");
+    setIsSubmitting(true);
     try {
       const data = await api.login(form);
       onAuth(data.user);
       navigate("/products");
     } catch (err) {
       setError(err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -37,7 +41,7 @@ export default function LoginPage({ onAuth }) {
             onChange={(e) => setForm({ ...form, password: e.target.value })}
           />
           {error && <p className="error-text">{error}</p>}
-          <button type="submit">Login</button>
+          <button type="submit" disabled={isSubmitting}>{isSubmitting ? "Logging in..." : "Login"}</button>
         </form>
         <p className="auth-note">No account? <Link to="/signup">Create one</Link></p>
       </section>

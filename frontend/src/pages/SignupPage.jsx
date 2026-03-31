@@ -6,16 +6,20 @@ export default function SignupPage({ onAuth }) {
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const submit = async (event) => {
     event.preventDefault();
     setError("");
+    setIsSubmitting(true);
     try {
       const data = await api.signup(form);
       onAuth(data.user);
       navigate("/products");
     } catch (err) {
       setError(err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -43,7 +47,7 @@ export default function SignupPage({ onAuth }) {
             onChange={(e) => setForm({ ...form, password: e.target.value })}
           />
           {error && <p className="error-text">{error}</p>}
-          <button type="submit">Create Account</button>
+          <button type="submit" disabled={isSubmitting}>{isSubmitting ? "Creating account..." : "Create Account"}</button>
         </form>
         <p className="auth-note">Already have an account? <Link to="/login">Login</Link></p>
       </section>

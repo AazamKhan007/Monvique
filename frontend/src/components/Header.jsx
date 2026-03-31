@@ -5,9 +5,12 @@ export default function Header({ cartCount = 0, user, onLoggedOut }) {
   const navigate = useNavigate();
 
   const onLogout = async () => {
-    await api.logout();
-    onLoggedOut();
-    navigate("/login");
+    try {
+      await api.logout();
+    } finally {
+      onLoggedOut();
+      navigate("/login");
+    }
   };
 
   return (
