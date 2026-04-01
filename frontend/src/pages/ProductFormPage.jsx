@@ -12,10 +12,25 @@ const initialState = {
   availability: "",
 };
 
+const CATEGORY_OPTIONS = [
+  "Electronics",
+  "Fashion",
+  "Home & Kitchen",
+  "Beauty",
+  "Sports",
+  "Books",
+  "Toys",
+  "Grocery",
+];
+
+const OTHER_CATEGORY_VALUE = "__other__";
+
 export default function ProductFormPage({ mode = "create" }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const [form, setForm] = useState(initialState);
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [customCategory, setCustomCategory] = useState("");
   const [imageFile, setImageFile] = useState(null);
   const [currentImage, setCurrentImage] = useState("");
   const [error, setError] = useState("");
@@ -31,29 +46,57 @@ export default function ProductFormPage({ mode = "create" }) {
     api.getProduct(id)
       .then((data) => {
         const product = data.product;
+        const loadedCategory = product.category || "";
+        const hasPresetCategory = CATEGORY_OPTIONS.includes(loadedCategory);
+
         setForm({
           title: product.title || "",
           description: product.description || "",
-          category: product.category || "",
+          category: loadedCategory,
           brand: product.brand || "",
           price: String(product.price ?? ""),
           discount: String(product.discount ?? 0),
           availability: product.availability || "",
         });
+        setSelectedCategory(hasPresetCategory ? loadedCategory : OTHER_CATEGORY_VALUE);
+        setCustomCategory(hasPresetCategory ? "" : loadedCategory);
         setCurrentImage(product.image || "");
       })
       .catch((err) => setError(err.message));
   }, [id, isEdit]);
 
+  useEffect(() => {
+    if (isEdit) {
+      return;
+    }
+
+    if (selectedCategory) {
+      return;
+    }
+
+    const defaultCategory = CATEGORY_OPTIONS[0] || "";
+    setSelectedCategory(defaultCategory);
+    setForm((prev) => ({ ...prev, category: defaultCategory }));
+  }, [isEdit, selectedCategory]);
+
   const onSubmit = async (event) => {
     event.preventDefault();
     setError("");
+
+    const resolvedCategory = selectedCategory === OTHER_CATEGORY_VALUE
+      ? customCategory.trim()
+      : selectedCategory;
+
+    if (!resolvedCategory) {
+      setError("Please select or enter a category.");
+      return;
+    }
 
     try {
       const payload = new FormData();
       payload.append("title", form.title);
       payload.append("description", form.description);
-      payload.append("category", form.category);
+      payload.append("category", resolvedCategory);
       payload.append("brand", form.brand);
       payload.append("availability", form.availability);
       payload.append("discount", form.discount);
@@ -94,13 +137,42 @@ export default function ProductFormPage({ mode = "create" }) {
           value={form.description}
           onChange={(e) => setForm({ ...form, description: e.target.value })}
         />
-        <input
-          type="text"
-          placeholder="Product category"
+        <label htmlFor="category">Category:</label>
+        <select
+          id="category"
           required
-          value={form.category}
-          onChange={(e) => setForm({ ...form, category: e.target.value })}
-        />
+          value={selectedCategory}
+          onChange={(e) => {
+            const value = e.target.value;
+            setSelectedCategory(value);
+
+            if (value === OTHER_CATEGORY_VALUE) {
+              setForm((prev) => ({ ...prev, category: customCategory.trim() }));
+              return;
+            }
+
+            setCustomCategory("");
+            setForm((prev) => ({ ...prev, category: value }));
+          }}
+        >
+          {CATEGORY_OPTIONS.map((category) => (
+            <option key={category} value={category}>{category}</option>
+          ))}
+          <option value={OTHER_CATEGORY_VALUE}>Other</option>
+        </select>
+        {selectedCategory === OTHER_CATEGORY_VALUE && (
+          <input
+            type="text"
+            placeholder="Enter custom category"
+            required
+            value={customCategory}
+            onChange={(e) => {
+              const value = e.target.value;
+              setCustomCategory(value);
+              setForm((prev) => ({ ...prev, category: value }));
+            }}
+          />
+        )}
         <input
           type="text"
           placeholder="Product brand"

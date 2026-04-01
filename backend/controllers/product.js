@@ -79,6 +79,28 @@ function getCartSummary(user) {
   };
 }
 
+function toOrderHistoryItem(product, quantity) {
+  const price = Number(product?.price || 0);
+  return {
+    productId: product?._id,
+    title: product?.title || "Untitled product",
+    category: product?.category || "",
+    brand: product?.brand || "",
+    image: product?.image || "",
+    price,
+    quantity,
+    lineTotal: price * quantity,
+  };
+}
+
+function appendOrderHistory(user, entry) {
+  if (!Array.isArray(user.orderHistory)) {
+    user.orderHistory = [];
+  }
+
+  user.orderHistory.unshift(entry);
+}
+
 async function handleGetAllProducts(req, res) {
   try {
     const query = (req.query.q || "").trim();
@@ -460,7 +482,22 @@ async function handleVerifyCheckoutPayment(req, res) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const { totalItems, totalAmount } = getCartSummary(user);
+    const { cartItems, totalItems, totalAmount } = getCartSummary(user);
+    if (!cartItems.length) {
+      return res.status(400).json({ message: "Cart is empty" });
+    }
+
+    const historyItems = cartItems.map((item) => toOrderHistoryItem(item.product, item.quantity));
+    appendOrderHistory(user, {
+      checkoutType: "cart",
+      paymentId,
+      orderId,
+      totalAmount,
+      totalItems,
+      items: historyItems,
+      purchasedAt: new Date(),
+    });
+
     user.cart = [];
     await user.save();
 
@@ -533,7 +570,9 @@ async function handleVerifyBuyNowPayment(req, res) {
   }
 
   try {
+    const { id } = req.params;
     const { razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: signature } = req.body;
+    const quantity = sanitizeQuantity(req.body.quantity);
 
     if (!orderId || !paymentId || !signature) {
       return res.status(400).json({ message: "Incomplete payment response" });
@@ -548,14 +587,55 @@ async function handleVerifyBuyNowPayment(req, res) {
       return res.status(400).json({ message: "Invalid payment signature" });
     }
 
-    return res.json({
+    const product = await Product.findById(id);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    const user = await User.findById(req.session.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const totalAmount = Number(product.price || 0) * quantity;
+    appendOrderHistory(user, {
       checkoutType: "buy-now",
       paymentId,
+      orderId,
+      totalAmount,
+      totalItems: quantity,
+      items: [toOrderHistoryItem(product, quantity)],
+      purchasedAt: new Date(),
+    });
+    await user.save();
+
+    return res.json({
+      checkoutType: "buy-now",
+      itemCount: quantity,
+      paymentId,
       success: true,
+      totalAmount,
     });
   } catch (error) {
     console.error("Verify buy-now payment failed:", error);
     return res.status(500).json({ message: "Payment verification failed" });
+  }
+}
+
+async function handleGetOrderHistory(req, res) {
+  if (!isUser(req)) {
+    return res.status(403).json({ message: "Only users can access order history" });
+  }
+
+  try {
+    const user = await User.findById(req.session.user.id).select("orderHistory");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.json({ history: user.orderHistory || [] });
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to fetch order history" });
   }
 }
 
@@ -575,4 +655,5 @@ module.exports = {
   handleVerifyCheckoutPayment,
   handleCreateBuyNowOrder,
   handleVerifyBuyNowPayment,
+  handleGetOrderHistory,
 };

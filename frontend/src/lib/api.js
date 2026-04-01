@@ -108,6 +108,7 @@ export const api = {
   }),
   removeCartItem: (productId) => request(`/product/cart/${productId}/remove`, { method: "POST" }),
   checkoutCart: () => request("/product/cart/checkout", { method: "POST" }),
+  getOrderHistory: () => request("/product/history", { method: "GET" }),
   createCheckoutOrder: () => request("/product/cart/checkout/order", { method: "POST" }),
   verifyCheckoutPayment: (body) => request("/product/cart/checkout/verify", {
     method: "POST",

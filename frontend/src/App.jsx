@@ -9,6 +9,8 @@ import ProductDetailPage from "./pages/ProductDetailPage";
 import CartPage from "./pages/CartPage";
 import ProductFormPage from "./pages/ProductFormPage";
 import CheckoutSuccessPage from "./pages/CheckoutSuccessPage";
+import OrderHistoryPage from "./pages/OrderHistoryPage";
+import NotFoundPage from "./pages/NotFoundPage";
 
 function ProtectedRoute({ user, children }) {
   if (!user) {
@@ -69,7 +71,10 @@ export default function App() {
 
   return (
     <>
-      {showHeader && <Header cartCount={cartCount} user={user} onLoggedOut={() => setUser(null)} />}
+      {showHeader && <Header cartCount={cartCount} user={user} onLoggedOut={() => {
+        setUser(null);
+        setCartCount(0);
+      }} />}
       <Routes>
         <Route path="/" element={<Navigate to={user ? "/products" : "/login"} replace />} />
         <Route path="/login" element={user ? <Navigate to="/products" replace /> : <LoginPage onAuth={setUser} />} />
@@ -130,6 +135,15 @@ export default function App() {
             </ProtectedRoute>
           )}
         />
+        <Route
+          path="/history"
+          element={(
+            <ProtectedRoute user={user}>
+              <OrderHistoryPage />
+            </ProtectedRoute>
+          )}
+        />
+        <Route path="*" element={<NotFoundPage user={user} />} />
       </Routes>
     </>
   );

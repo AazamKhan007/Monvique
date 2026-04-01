@@ -15,6 +15,7 @@ const {
   handleVerifyCheckoutPayment,
   handleCreateBuyNowOrder,
   handleVerifyBuyNowPayment,
+  handleGetOrderHistory,
 } = require("../controllers/product");
 const { upload } = require("../upload");
 const { ensureAuthenticated, ensureAdmin } = require("../middleware/auth");
@@ -30,6 +31,7 @@ router.post("/cart/:productId/remove", handleRemoveCartItem);
 router.post("/cart/checkout", handleCheckout);
 router.post("/cart/checkout/order", handleCreateCheckoutOrder);
 router.post("/cart/checkout/verify", handleVerifyCheckoutPayment);
+router.get("/history", handleGetOrderHistory);
 router.get("/:id", handleGetProductDetail);
 router.post("/:id/cart", handleUpsertCartItem);
 router.post("/:id/buy-now/order", handleCreateBuyNowOrder);

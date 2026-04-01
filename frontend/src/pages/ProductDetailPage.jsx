@@ -88,19 +88,15 @@ export default function ProductDetailPage({ user, setCartCount }) {
         currency: orderPayload.currency,
         handler: async (response) => {
           try {
-            await api.verifyBuyNowPayment(id, {
+            const verified = await api.verifyBuyNowPayment(id, {
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
+              quantity,
             });
             setCartCount(0);
             navigate("/checkout-success", {
-              state: {
-                checkoutType: "buy-now",
-                itemCount: orderPayload.itemCount,
-                totalAmount: orderPayload.totalAmount,
-                success: true,
-              },
+              state: verified,
             });
           } catch (verifyError) {
             setError(`Payment verification failed: ${verifyError.message}`);
