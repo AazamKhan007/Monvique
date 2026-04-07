@@ -10,6 +10,7 @@ const { connectMongoDb } = require("./connection");
 const { attachCurrentUser } = require("./middleware/auth");
 const productRouter = require("./routes/product");
 const userRouter = require("./routes/user");
+const adminRouter = require("./routes/admin");
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -83,6 +84,7 @@ if (isProduction) {
 
 app.use("/api/user", userRouter);
 app.use("/api/product", productRouter);
+app.use("/api/admin", adminRouter);
 
 app.get("/api/health", (req, res) => {
   res.json({ ok: true });

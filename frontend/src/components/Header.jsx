@@ -35,6 +35,11 @@ export default function Header({ cartCount = 0, user, onLoggedOut }) {
     navigate("/history");
   };
 
+  const openAdmin = () => {
+    setMenuOpen(false);
+    navigate("/admin");
+  };
+
   const initials = (user?.name || "U").trim().charAt(0).toUpperCase() || "U";
 
   return (
@@ -43,8 +48,11 @@ export default function Header({ cartCount = 0, user, onLoggedOut }) {
         <Link to="/products" className="brand">Monvique</Link>
         <div className="header-right-block">
           {user?.role === "user" && (
-            <Link className="cart-link-btn" to="/cart">
-              Cart ({cartCount})
+            <Link className="cart-link-btn cart-icon-btn" to="/cart" aria-label="Cart">
+              <span className="cart-icon-wrap">
+                <i className="fa-solid fa-cart-shopping" aria-hidden="true"></i>
+                <span className="cart-count-badge">{cartCount}</span>
+              </span>
             </Link>
           )}
           {user?.role === "admin" && <p className="session-note">Admin: <strong>{user?.name || "-"}</strong></p>}
@@ -65,6 +73,11 @@ export default function Header({ cartCount = 0, user, onLoggedOut }) {
                 {user?.role === "user" && (
                   <button type="button" className="avatar-menu-item" onClick={openHistory}>
                     Order History
+                  </button>
+                )}
+                {user?.role === "admin" && (
+                  <button type="button" className="avatar-menu-item" onClick={openAdmin}>
+                    Admin Dashboard
                   </button>
                 )}
                 <button type="button" className="avatar-menu-item danger" onClick={onLogout}>

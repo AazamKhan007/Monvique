@@ -10,6 +10,7 @@ import CartPage from "./pages/CartPage";
 import ProductFormPage from "./pages/ProductFormPage";
 import CheckoutSuccessPage from "./pages/CheckoutSuccessPage";
 import OrderHistoryPage from "./pages/OrderHistoryPage";
+import AdminDashboardPage from "./pages/AdminDashboardPage";
 import NotFoundPage from "./pages/NotFoundPage";
 
 function ProtectedRoute({ user, children }) {
@@ -141,6 +142,14 @@ export default function App() {
             <ProtectedRoute user={user}>
               <OrderHistoryPage />
             </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="/admin"
+          element={(
+            <AdminRoute user={user}>
+              <AdminDashboardPage />
+            </AdminRoute>
           )}
         />
         <Route path="*" element={<NotFoundPage user={user} />} />

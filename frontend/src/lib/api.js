@@ -125,4 +125,11 @@ export const api = {
   createProduct: (formData) => request("/product", { method: "POST", body: formData }),
   updateProduct: (id, formData) => request(`/product/${id}`, { method: "PUT", body: formData }),
   deleteProduct: (id) => request(`/product/${id}`, { method: "DELETE" }),
+  getAnalytics: () => request("/admin/analytics", { method: "GET" }),
+  getAllUsers: () => request("/admin/users", { method: "GET" }),
+  deleteUser: (id) => request(`/admin/users/${id}`, { method: "DELETE" }),
+  updateUserRole: (id, role) => request(`/user/${id}/role`, {
+    method: "POST",
+    body: JSON.stringify({ role }),
+  }),
 };
